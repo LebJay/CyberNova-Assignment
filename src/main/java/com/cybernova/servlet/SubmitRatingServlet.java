@@ -1,0 +1,66 @@
+package com.cybernova.servlet;
+
+import com.cybernova.dao.RatingDAO;
+import com.cybernova.model.Rating;
+import com.cybernova.util.InputValidator;
+import jakarta.servlet.ServletException;
+import jakarta.servlet.annotation.WebServlet;
+import jakarta.servlet.http.HttpServlet;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
+
+@WebServlet("/submit-rating")
+public class SubmitRatingServlet extends HttpServlet {
+
+    private final RatingDAO ratingDAO = new RatingDAO();
+
+    @Override
+    protected void doPost(HttpServletRequest request, HttpServletResponse response)
+            throws ServletException, IOException {
+
+        String customerName = request.getParameter("customerName");
+        String ratingValueStr = request.getParameter("ratingValue");
+        String comment = request.getParameter("comment");
+
+        List<String> errors = new ArrayList<>();
+
+        if (InputValidator.isBlank(customerName)) {
+            errors.add("Your name is required");
+        }
+
+        int ratingValue = 0;
+        try {
+            ratingValue = Integer.parseInt(ratingValueStr);
+            if (ratingValue < 1 || ratingValue > 5) {
+                errors.add("Rating must be between 1 and 5");
+            }
+        } catch (NumberFormatException e) {
+            errors.add("Please select a rating");
+        }
+
+        if (!errors.isEmpty()) {
+            request.getSession().setAttribute("ratingErrors", errors);
+            response.sendRedirect(request.getContextPath() + "/testimonials?error=validation");
+            return;
+        }
+
+        try {
+            Rating newRating = new Rating();
+            newRating.setCustomerName(customerName.trim());
+            newRating.setRatingValue(ratingValue);
+            newRating.setComment(comment != null ? comment.trim() : "");
+
+            ratingDAO.saveNewRating(newRating);
+
+            // ✅ Redirects back to the public testimonials page, NOT admin
+            response.sendRedirect(request.getContextPath() + "/testimonials?submitted=true");
+
+        } catch (Exception e) {
+            response.sendRedirect(request.getContextPath() + "/testimonials?error=server");
+        }
+    }
+}
